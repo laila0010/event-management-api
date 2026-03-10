@@ -2,17 +2,18 @@
 
 Backend API for managing events and user registrations built with **NestJS**, **TypeScript**, **TypeORM**, and **PostgreSQL**.
 
-This project was developed as part of the **DIGIT Technical Test** to demonstrate backend architecture, API design, and business rule implementation.
+This project was developed as part of the **DIGIT Technical Technical Assessment** to demonstrate backend architecture, API design, and business rule implementation.
 
 ---
 
 # Tech Stack
 
-* **Framework:** NestJS
-* **Language:** TypeScript
-* **ORM:** TypeORM
-* **Database:** PostgreSQL
-* **API Testing:** Postman
+- **Framework:** NestJS
+- **Language:** TypeScript
+- **ORM:** TypeORM
+- **Database:** PostgreSQL
+- **Authentication:** JWT
+- **API Testing:** Postman
 
 ---
 
@@ -20,14 +21,8 @@ This project was developed as part of the **DIGIT Technical Test** to demonstrat
 
 ## Module-Based Structure
 
-The application follows a **modular architecture** based on NestJS best practices.
-The codebase is divided into three core modules:
-
-* **Users Module**
-* **Events Module**
-* **Registrations Module**
-
-This ensures **Separation of Concerns**, making the project easier to maintain, test, and scale.
+The application follows a **modular architecture** based on NestJS best practices.  
+The codebase is divided into independent modules to ensure **separation of concerns** and maintainability.
 
 ```
 src
@@ -35,6 +30,17 @@ src
  │    └── database.config.ts
  │
  ├── modules
+ │    ├── auth
+ │    │    ├── dto
+ │    │    ├── guards
+ │    │    ├── strategies
+ │    │    ├── auth.controller.ts
+ │    │    └── auth.service.ts
+ │
+ │    ├── users
+ │    │    ├── entities
+ │    │    └── users.service.ts
+ │
  │    ├── events
  │    │    ├── dto
  │    │    ├── entities
@@ -48,70 +54,100 @@ src
  │    │    ├── registrations.controller.ts
  │    │    └── registrations.service.ts
  │
- │    └── users
+ │    └── audit
  │         ├── entities
- │         └── users.service.ts
+ │         ├── audit.controller.ts
+ │         └── audit.interceptor.ts
 ```
-
----
-
-# Architecture & Design Decisions
-
-## 1. Module-Based Design
-
-The system is divided into independent modules (**Users, Events, Registrations**) to enforce clear responsibilities and maintainability.
-
-## 2. Data Integrity & Business Rules
-
-To meet the technical requirements, several constraints were implemented both at the **Application Layer (NestJS)** and **Database Layer (PostgreSQL)**.
-
-### Conflict Prevention
-
-A **UNIQUE constraint on `event_date`** prevents multiple events from being scheduled at the exact same time.
-
-### Double Registration Prevention
-
-A **composite UNIQUE constraint on (`user_id`, `event_id`)** prevents users from registering more than once for the same event.
-
-### Capacity Management
-
-Before approving or creating a registration, the system verifies that the number of approved attendees does not exceed the `max_attendees` limit.
-
----
-
-# Validation
-
-All incoming requests are validated using **NestJS ValidationPipe**.
-
-This ensures:
-
-* Correct data types
-* Required fields are provided
-* Invalid requests are rejected before reaching the business logic
 
 ---
 
 # Key Features Implemented
 
-✅ Event creation and management (Admin)
+### Core Features
 
-✅ Retrieve upcoming events only
-
-✅ Event registration workflow
+- Event creation and management (Admin)
+- Retrieve all events
+- Retrieve upcoming events
+- Retrieve event details
+- Event registration workflow
 
 ```
 Pending → Approved
 ```
 
-✅ Automatic business rule enforcement:
+- Retrieve event attendees
 
-* Prevent duplicate registrations
-* Enforce event capacity limits
-* Prevent registration to past events
+---
+
+# Business Rules Enforcement
+
+The following rules are enforced at the API level:
+
+### Event Scheduling Conflict Prevention
+Two events cannot be scheduled at the same date and time.
+
+### Duplicate Registration Prevention
+A user can register **only once per event**.
+
+### Capacity Management
+Registrations cannot exceed the defined `max_attendees` limit.
+
+### Past Event Protection
+Users cannot register for events that have already occurred.
+
+---
+
+# Optional Enhancements Implemented
+
+Although optional, the following features were implemented:
+
+### Authentication
+JWT-based authentication allowing users to access protected endpoints.
+
+### Role-Based Access Control (RBAC)
+Administrative endpoints are protected using guards to ensure that only users with the **ADMIN role** can perform management operations.
+
+### Audit Logging
+All administrative operations (POST, PATCH, DELETE) are logged automatically using a **global NestJS interceptor**.
+
+The audit log stores:
+
+- Admin ID
+- Operation performed
+- Target entity
+- Entity ID
+- Timestamp
+
+---
+
+# Validation
+
+All incoming requests are validated using **NestJS ValidationPipe** to ensure:
+
+- Required fields exist
+- Correct data types
+- Invalid requests are rejected before reaching business logic
 
 ---
 
 # API Endpoints
+
+## Authentication
+
+Register
+
+```
+POST /auth/register
+```
+
+Login
+
+```
+POST /auth/login
+```
+
+---
 
 ## Events
 
@@ -121,10 +157,22 @@ Create event
 POST /events
 ```
 
+Get all events
+
+```
+GET /events
+```
+
 Get upcoming events
 
 ```
 GET /events/upcoming
+```
+
+Get event details
+
+```
+GET /events/:id
 ```
 
 Update event
@@ -163,6 +211,70 @@ GET /registrations/event/:eventId
 
 ---
 
+## Audit Logs (Admin only)
+
+Retrieve all administrative logs
+
+```
+GET /audit-logs
+```
+
+---
+
+# Setup Instructions
+
+## Install dependencies
+
+```
+npm install
+```
+
+---
+
+# Environment Variables
+
+Create a `.env` file in the project root.
+
+```
+JWT_SECRET=supersecretkey
+
+DB_HOST=localhost
+DB_PORT=5432
+DB_USER=postgres
+DB_PASSWORD=postgres
+DB_NAME=events_db
+```
+
+---
+
+# Database Setup
+
+Create a PostgreSQL database named:
+
+```
+events_db
+```
+
+The schema will be automatically created using **TypeORM synchronization** when the application starts.
+
+---
+
+# Running the Application
+
+Development mode
+
+```
+npm run start:dev
+```
+
+Server runs on:
+
+```
+http://localhost:3000
+```
+
+---
+
 # Postman Collection
 
 A complete **Postman Collection** is included in the repository.
@@ -173,51 +285,31 @@ Event_Management_API.postman_collection.json
 
 ## Steps to use
 
-1. Import the JSON file into Postman.
-2. Use **Admin endpoints** to create events.
-3. Use **User endpoints** to browse events and register.
+1. Import the collection into Postman
+2. Run the authentication endpoints
+3. Use the returned JWT token for protected endpoints
 
 ---
 
 # Assumptions, Limitations & Trade-offs
 
-## Identity Management
+### Identity Management
+The system uses a simplified **email-based authentication model** suitable for demonstration purposes.
 
-Due to the **48-hour timeframe**, a simplified **email-based identity system** was implemented.
+### Audit Logging Scope
+Only administrative actions are logged. User read operations are intentionally excluded.
 
-The current schema is designed so that **JWT Authentication** can be added easily in the future through a dedicated Auth module.
+### Timezone Handling
+All event timestamps are stored in **UTC**.
 
-## Audit Logging
-
-The architecture includes preparation for **audit logging** to support future administrative monitoring and compliance features.
-
-## Timezone Handling
-
-All event dates are assumed to be stored in **UTC** to avoid inconsistencies between the server and database.
+### Deployment
+Deployment was not implemented due to the limited timeframe but the project structure supports containerization and cloud deployment.
 
 ---
-
-# Installation
-
-Install dependencies:
-
-```bash
-npm install
-```
-
----
-
-# Running the Application
-
-Development mode
-
-```bash
-npm run start:dev
-
 
 # Author
 
 **Laila Abou Hatab**
 
-DIGIT Technical Test
+DIGIT Technical Assessment  
 March 2026

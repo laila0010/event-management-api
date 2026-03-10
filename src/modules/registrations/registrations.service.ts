@@ -20,48 +20,63 @@ export class RegistrationsService {
     private userRepo: Repository<User>,
   ) {}
 
-  async register(eventId: number, userId: number) {
-    const event = await this.eventRepo.findOne({
-      where: { id: eventId },
-      relations: ['registrations'],
-    });
+async register(eventId: number, userId: number) {
 
-    if (!event) {
-      throw new NotFoundException('Event not found');
-    }
+  const event = await this.eventRepo.findOne({
+    where: { id: eventId }
+  });
 
-   if (new Date(event.event_date) < new Date()) {
+  if (!event) {
+    throw new NotFoundException('Event not found');
+  }
+
+  if (new Date(event.event_date) < new Date()) {
     throw new BadRequestException('Event has already passed');
   }
 
-    const user = await this.userRepo.findOne({ where: { id: userId } });
-    if (!user) {
-      throw new NotFoundException('User not found');
-    }
+  const user = await this.userRepo.findOne({
+    where: { id: userId }
+  });
 
-    const existing = await this.registrationRepo.findOne({
-      where: { user: { id: userId }, event: { id: eventId } },
-    });
+  if (!user) {
+    throw new NotFoundException('User not found');
+  }
 
-    if (existing) {
-      throw new BadRequestException('User already registered for this event');
-    }
+  const existing = await this.registrationRepo.findOne({
+    where: { user: { id: userId }, event: { id: eventId } },
+  });
 
-const approvedCount = await this.registrationRepo.count({
-    where: { event: { id: eventId }, status: registration_status.APPROVED }
+  if (existing) {
+    throw new BadRequestException('User already registered for this event');
+  }
+
+  const approvedCount = await this.registrationRepo.count({
+    where: {
+      event: { id: eventId },
+      status: registration_status.APPROVED,
+    },
   });
 
   if (approvedCount >= event.max_attendees) {
     throw new BadRequestException('Event capacity reached');
   }
-    const registration = this.registrationRepo.create({
-      user,
-      event,
-      status: registration_status.PENDING,
-    });
 
-    return this.registrationRepo.save(registration);
-  }
+  const registration = this.registrationRepo.create({
+    user,
+    event,
+    status: registration_status.PENDING,
+  });
+
+  const saved = await this.registrationRepo.save(registration);
+
+  return {
+    message: 'Registration submitted successfully',
+    registrationId: saved.id,
+    status: saved.status,
+    eventId: event.id,
+    userId: user.id,
+  };
+}
 
   async approve(registrationId: number) {
     const registration = await this.registrationRepo.findOne({
